@@ -68,8 +68,28 @@ while running:
     clock.tick(FPS)
 
     for event in pygame.event.get():
-        if event.type = pygame.QUIT:
+        if event.type == pygame.QUIT:
             running = False
+        elif event.type == pygame.KEYDOWN:
+            if event.key == pygame.K_LEFT:
+                hero1.x_change = -5
+            if event.key == pygame.K_RIGHT:
+                hero1.x_change = 5
+            if event.key == pygame.K_UP:
+                hero1.y_change = -5
+            if event.type == pygame.K_DOWN:
+                hero1.y_change = 5
+
+
+            if event.key == pygame.K_a:
+                hero2.x_change = -10
+            if event.key == pygame.K_d:
+                hero2.x_change = 10
+            if event.key == pygame.K_w:
+                hero2.y_change = -10
+            if event.key == pygame.K_s:
+                hero2.y_change = 10
+
 
 
 pygame.quit()
