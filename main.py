@@ -18,6 +18,8 @@ img_surf = pygame.transform.scale(img_surf, (WIDTH, HEIGHT))
 img_hero = pygame.image.load("./hero.png").convert_alpha()
 img_hero2 = pygame.image.load("./hero2.png").convert_alpha()
 
+walk = ('walk_sound.mp3')
+
 music_files = ["music1.mp3", "music2.mp3", "music3.mp3"]
 current_track = 0
 pygame.mixer.music.load(music_files[current_track])
