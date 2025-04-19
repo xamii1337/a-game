@@ -1,13 +1,13 @@
 import pygame
 from pygame.mixer import find_channel
 
-WIDTH = 1920  # ширина игрового окна
-HEIGHT = 1080  # высота игрового окна
-FPS = 30  # частота кадров в секунду
+WIDTH = 1920
+HEIGHT = 1080
+FPS = 30
 
 # создаем игру и окно
 pygame.init()
-pygame.mixer.init()  # для звука
+pygame.mixer.init()
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
 pygame.display.set_caption("subsurf")
 clock = pygame.time.Clock()
@@ -18,6 +18,10 @@ img_surf = pygame.transform.scale(img_surf, (WIDTH, HEIGHT))
 img_hero = pygame.image.load("./hero.png").convert_alpha()
 img_hero2 = pygame.image.load("./hero2.png").convert_alpha()
 
+music_files = ["music1.mp3", "music2.mp3", "music3.mp3"]
+current_track = 0
+pygame.mixer.music.load(music_files[current_track])
+pygame.mixer.music.play()
 
 class Hero(pygame.sprite.Sprite):
     def __init__(self, name, age, image, x, y):
@@ -42,34 +46,24 @@ class Hero(pygame.sprite.Sprite):
         if self.rect.bottom < 0:
             self.rect.top = HEIGHT
 
-# Создание экземпляров героев с правильными именами
 hero1 = Hero("hero", 40, img_hero, 500, 750)
 hero2 = Hero("hero2", 16, img_hero2, 750, 750)
 
-# Группа спрайтов
 all_sprites = pygame.sprite.Group()
-all_sprites.add(hero1, hero2)  # Добавляем экземпляры класса Hero
+all_sprites.add(hero1, hero2)
 
-# Главный игровой цикл
 running = True
 while running:
-    for event in pygame.event.get():
-        if event.type == pygame.QUIT:
-            running = False
-#
-    # Отображение фона и обновление экрана
-    screen.blit(img_surf, (0, 0))
-
-    # Обновление и отрисовка всех спрайтов
-    all_sprites.update()
-    all_sprites.draw(screen)
-
-    pygame.display.flip()
-    clock.tick(FPS)
+    # Проверка, закончилась ли музыка
+    if not pygame.mixer.music.get_busy():  # если не играет
+        current_track = (current_track + 1) % len(music_files)  # следующий трек
+        pygame.mixer.music.load(music_files[current_track])
+        pygame.mixer.music.play()
 
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             running = False
+
         elif event.type == pygame.KEYDOWN:
             if event.key == pygame.K_LEFT:
                 hero1.x_change = -5
@@ -77,9 +71,8 @@ while running:
                 hero1.x_change = 5
             if event.key == pygame.K_UP:
                 hero1.y_change = -5
-            if event.type == pygame.K_DOWN:
+            if event.key == pygame.K_DOWN:
                 hero1.y_change = 5
-
 
             if event.key == pygame.K_a:
                 hero2.x_change = -10
@@ -90,6 +83,21 @@ while running:
             if event.key == pygame.K_s:
                 hero2.y_change = 10
 
+        elif event.type == pygame.KEYUP:
+            if event.key in (pygame.K_LEFT, pygame.K_RIGHT):
+                hero1.x_change = 0
+            if event.key in (pygame.K_UP, pygame.K_DOWN):
+                hero1.y_change = 0
 
+            if event.key in (pygame.K_a, pygame.K_d):
+                hero2.x_change = 0
+            if event.key in (pygame.K_w, pygame.K_s):
+                hero2.y_change = 0
+
+    screen.blit(img_surf, (0, 0))
+    all_sprites.update()
+    all_sprites.draw(screen)
+    pygame.display.flip()
+    clock.tick(FPS)
 
 pygame.quit()
