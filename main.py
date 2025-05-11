@@ -15,15 +15,15 @@ screen = pygame.display.set_mode((WIDTH, HEIGHT))
 pygame.display.set_caption("subsurf")
 clock = pygame.time.Clock()
 
-img_surf = pygame.image.load("background.jfif").convert_alpha()
+img_surf = pygame.image.load("photos/background.jfif").convert_alpha()
 img_surf = pygame.transform.scale(img_surf, (WIDTH, HEIGHT))
-img_hero = pygame.image.load("./hero.png").convert_alpha()
-img_hero2 = pygame.image.load("./hero2.png").convert_alpha()
+img_hero = pygame.image.load("photos/hero.png").convert_alpha()
+img_hero2 = pygame.image.load("photos/hero2.png").convert_alpha()
 
-walk_sound = pygame.mixer.Sound('walk_sound.mp3')
+walk_sound = pygame.mixer.Sound('sounds/walk_sound.mp3')
 walk_channel = pygame.mixer.Channel(1)
 
-music_files = ["music1.mp3", "music2.mp3", "music3.mp3"]
+music_files = ["sounds/music1.mp3", "sounds/music2.mp3", "sounds/music3.mp3"]
 current_track = 0
 pygame.mixer.music.load(music_files[current_track])
 pygame.mixer.music.play()
@@ -45,6 +45,13 @@ for name in BLOCK_NAMES:
 selected_block_index = 0
 placed_blocks = []
 
+class Block(pygame.sprite.Sprite):
+    def __init__(self, x, y, block_type):
+        super().__init__()
+        self.image = BLOCK_TYPES[block_type]["image"]
+        self.rect = self.image.get_rect()
+        self.rect.topleft = (x, y)
+
 class Hero(pygame.sprite.Sprite):
     def __init__(self, name, age, image, x, y):
         super().__init__()
@@ -62,12 +69,26 @@ class Hero(pygame.sprite.Sprite):
 
     def update(self):
         self.rect.x += self.x_change
+        if pygame.sprite.spritecollide(self, placed_blocks_group, False):
+            if self.x_change > 0:
+                self.rect.right = min([block.rect.left for block in placed_blocks_group if block.rect.colliderect(self.rect)])
+            elif self.x_change < 0:
+                self.rect.left = max([block.rect.right for block in placed_blocks_group if block.rect.colliderect(self.rect)])
+
         self.velocity_y += self.gravity
         self.rect.y += self.velocity_y
 
-        ground_level = HEIGHT - 60 - GROUND_LEVEL_OFFSET
-        if self.rect.bottom >= ground_level:
-            self.rect.bottom = ground_level
+        if pygame.sprite.spritecollide(self, placed_blocks_group, False):
+            if self.velocity_y > 0:
+                self.rect.bottom = min([block.rect.top for block in placed_blocks_group if block.rect.colliderect(self.rect)])
+                self.velocity_y = 0
+                self.on_ground = True
+            elif self.velocity_y < 0:
+                self.rect.top = max([block.rect.bottom for block in placed_blocks_group if block.rect.colliderect(self.rect)])
+                self.velocity_y = 0
+
+        if self.rect.bottom >= HEIGHT - GROUND_LEVEL_OFFSET:
+            self.rect.bottom = HEIGHT - GROUND_LEVEL_OFFSET
             self.velocity_y = 0
             self.on_ground = True
         else:
@@ -100,8 +121,8 @@ def draw_inventory(surface):
             pygame.draw.rect(surface, (0, 0, 0), rect, 1)
 
 def draw_blocks(surface):
-    for pos, index in placed_blocks:
-        surface.blit(BLOCK_TYPES[index]["image"], pos)
+    for block in placed_blocks_group:
+        surface.blit(block.image, block.rect.topleft)
 
 hero1 = Hero("hero", 40, img_hero, 500, 750)
 hero2 = Hero("hero2", 16, img_hero2, 750, 750)
@@ -109,6 +130,8 @@ hero2 = Hero("hero2", 16, img_hero2, 750, 750)
 all_sprites = pygame.sprite.Group()
 money_group = pygame.sprite.Group()
 all_sprites.add(hero1, hero2)
+
+placed_blocks_group = pygame.sprite.Group()
 
 MONEY_Y = HEIGHT - 200 - GROUND_LEVEL_OFFSET
 MONEY_SPACING = 180
@@ -171,13 +194,17 @@ while running:
             grid_y = (mouse_y // TILE_SIZE) * TILE_SIZE
             if event.button == 3:
                 placed_blocks.append(((grid_x, grid_y), selected_block_index))
+                block = Block(grid_x, grid_y, selected_block_index)
+                placed_blocks_group.add(block)
             elif event.button == 1:
-                placed_blocks = [b for b in placed_blocks if b[0] != (grid_x, grid_y)]
+                for block in placed_blocks_group:
+                    if block.rect.collidepoint(mouse_x, mouse_y):
+                        placed_blocks_group.remove(block)
 
     for hero in [hero1, hero2]:
         coins_collected = pygame.sprite.spritecollide(hero, money_group, True)
         if coins_collected:
-            pygame.mixer.Sound('monetka.mp3').play()
+            pygame.mixer.Sound('sounds/monetka.mp3').play()
             score += len(coins_collected)
 
     screen.blit(img_surf, (0, 0))
@@ -196,7 +223,7 @@ while running:
     if score >= 10 and not win_sound_played:
         text = font.render("Вы победили! Ваш счет равен десяти", True, (255, 255, 255))
         screen.blit(text, (960 - text.get_width() // 2, 540 - text.get_height() // 2))
-        pygame.mixer.Sound('win.mp3').play()
+        pygame.mixer.Sound('sounds/win.mp3').play()
         win_sound_played = True
 
     pygame.display.flip()
