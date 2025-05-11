@@ -1,9 +1,13 @@
 import pygame
+import os
 from pygame.mixer import find_channel
 
 WIDTH = 1920
 HEIGHT = 1080
-FPS = 30
+FPS = 165
+TILE_SIZE = 50
+GROUND_LEVEL_OFFSET = 100
+HERO_SPEED_X = 5
 
 pygame.init()
 pygame.mixer.init()
@@ -26,6 +30,20 @@ pygame.mixer.music.play()
 
 font = pygame.font.SysFont("Arial", 48, bold=True)
 
+BLOCK_NAMES = [
+    "wood", "planks", "glass", "sand", "dirt",
+    "stone", "gravel", "leaves", "obsidian", "coal"
+]
+BLOCK_TYPES = []
+
+for name in BLOCK_NAMES:
+    path = os.path.join("blocks", f"{name}.jpg")
+    image = pygame.image.load(path).convert_alpha()
+    image = pygame.transform.scale(image, (TILE_SIZE, TILE_SIZE))
+    BLOCK_TYPES.append({"name": name.capitalize(), "image": image})
+
+selected_block_index = 0
+placed_blocks = []
 
 class Hero(pygame.sprite.Sprite):
     def __init__(self, name, age, image, x, y):
@@ -37,19 +55,32 @@ class Hero(pygame.sprite.Sprite):
         self.rect.topleft = (x, y)
         self.x_change = 0
         self.y_change = 0
+        self.velocity_y = 0
+        self.gravity = 0.5
+        self.jump_strength = -12
+        self.on_ground = False
 
     def update(self):
         self.rect.x += self.x_change
-        self.rect.y += self.y_change
+        self.velocity_y += self.gravity
+        self.rect.y += self.velocity_y
+
+        ground_level = HEIGHT - 60 - GROUND_LEVEL_OFFSET
+        if self.rect.bottom >= ground_level:
+            self.rect.bottom = ground_level
+            self.velocity_y = 0
+            self.on_ground = True
+        else:
+            self.on_ground = False
+
         if self.rect.left > WIDTH:
             self.rect.right = 0
         if self.rect.right < 0:
             self.rect.left = WIDTH
-        if self.rect.top > HEIGHT:
-            self.rect.bottom = 0
-        if self.rect.bottom < 0:
-            self.rect.top = HEIGHT
 
+    def jump(self):
+        if self.on_ground:
+            self.velocity_y = self.jump_strength
 
 class Money(pygame.sprite.Sprite):
     def __init__(self, x, y, radius=20):
@@ -59,6 +90,18 @@ class Money(pygame.sprite.Sprite):
         self.rect = self.image.get_rect()
         self.rect.center = (x, y)
 
+def draw_inventory(surface):
+    for i, block in enumerate(BLOCK_TYPES):
+        rect = pygame.Rect(10 + i * 60, HEIGHT - 60, 50, 50)
+        surface.blit(block["image"], rect.topleft)
+        if i == selected_block_index:
+            pygame.draw.rect(surface, (255, 255, 0), rect, 3)
+        else:
+            pygame.draw.rect(surface, (0, 0, 0), rect, 1)
+
+def draw_blocks(surface):
+    for pos, index in placed_blocks:
+        surface.blit(BLOCK_TYPES[index]["image"], pos)
 
 hero1 = Hero("hero", 40, img_hero, 500, 750)
 hero2 = Hero("hero2", 16, img_hero2, 750, 750)
@@ -67,8 +110,7 @@ all_sprites = pygame.sprite.Group()
 money_group = pygame.sprite.Group()
 all_sprites.add(hero1, hero2)
 
-MONEY_Y = HEIGHT - 200
-
+MONEY_Y = HEIGHT - 200 - GROUND_LEVEL_OFFSET
 MONEY_SPACING = 180
 for x in range(100, WIDTH - 100, MONEY_SPACING):
     coin = Money(x, MONEY_Y)
@@ -91,40 +133,46 @@ while running:
 
         elif event.type == pygame.KEYDOWN:
             if event.key == pygame.K_LEFT:
-                hero1.x_change = -5
+                hero1.x_change = -HERO_SPEED_X
             if event.key == pygame.K_RIGHT:
-                hero1.x_change = 5
+                hero1.x_change = HERO_SPEED_X
             if event.key == pygame.K_UP:
-                hero1.y_change = -5
-            if event.key == pygame.K_DOWN:
-                hero1.y_change = 5
+                hero1.jump()
 
             if event.key == pygame.K_a:
-                hero2.x_change = -10
+                hero2.x_change = -HERO_SPEED_X
             if event.key == pygame.K_d:
-                hero2.x_change = 10
+                hero2.x_change = HERO_SPEED_X
             if event.key == pygame.K_w:
-                hero2.y_change = -10
-            if event.key == pygame.K_s:
-                hero2.y_change = 10
+                hero2.jump()
+
+            if pygame.K_1 <= event.key <= pygame.K_9:
+                selected_block_index = event.key - pygame.K_1
+            elif event.key == pygame.K_0:
+                selected_block_index = 9
 
             if not walk_channel.get_busy() and (
-                    hero1.x_change != 0 or hero1.y_change != 0 or hero2.x_change != 0 or hero2.y_change != 0):
+                    hero1.x_change != 0 or hero1.velocity_y != 0 or hero2.x_change != 0 or hero2.velocity_y != 0):
                 walk_channel.play(walk_sound, loops=-1)
 
         elif event.type == pygame.KEYUP:
             if event.key in (pygame.K_LEFT, pygame.K_RIGHT):
                 hero1.x_change = 0
-            if event.key in (pygame.K_UP, pygame.K_DOWN):
-                hero1.y_change = 0
 
             if event.key in (pygame.K_a, pygame.K_d):
                 hero2.x_change = 0
-            if event.key in (pygame.K_w, pygame.K_s):
-                hero2.y_change = 0
 
-            if hero1.x_change == 0 and hero1.y_change == 0 and hero2.x_change == 0 and hero2.y_change == 0:
+            if hero1.x_change == 0 and hero1.velocity_y == 0 and hero2.x_change == 0 and hero2.velocity_y == 0:
                 walk_channel.stop()
+
+        elif event.type == pygame.MOUSEBUTTONDOWN:
+            mouse_x, mouse_y = pygame.mouse.get_pos()
+            grid_x = (mouse_x // TILE_SIZE) * TILE_SIZE
+            grid_y = (mouse_y // TILE_SIZE) * TILE_SIZE
+            if event.button == 3:
+                placed_blocks.append(((grid_x, grid_y), selected_block_index))
+            elif event.button == 1:
+                placed_blocks = [b for b in placed_blocks if b[0] != (grid_x, grid_y)]
 
     for hero in [hero1, hero2]:
         coins_collected = pygame.sprite.spritecollide(hero, money_group, True)
@@ -133,6 +181,7 @@ while running:
             score += len(coins_collected)
 
     screen.blit(img_surf, (0, 0))
+    draw_blocks(screen)
     all_sprites.update()
     all_sprites.draw(screen)
 
@@ -141,6 +190,8 @@ while running:
     bg_rect.fill((0, 0, 0, 180))
     screen.blit(bg_rect, (20, 20))
     screen.blit(score_text, (400, 100))
+
+    draw_inventory(screen)
 
     if score >= 10 and not win_sound_played:
         text = font.render("Вы победили! Ваш счет равен десяти", True, (255, 255, 255))
